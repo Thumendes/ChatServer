@@ -5,36 +5,24 @@ import morgan from "morgan";
 import cors from "cors";
 import http from "http";
 import { Server } from "socket.io";
+import Ws from "./ws";
+import { ChatEvents } from "./data/chat";
+import { onJoinChannel, onSendMessage } from "./services/chat";
 
 async function main() {
-  const app = express();
   const port = process.env.PORT;
+  const app = express();
+
   app.use(morgan("dev"));
   app.use(cors());
 
   const server = http.createServer(app);
 
-  const io = new Server(server, {
-    cors: {
-      origin: "*",
-    },
-  });
+  const ws = new Ws(server);
+  ws.set(ChatEvents.JoinChannel, onJoinChannel);
+  ws.set(ChatEvents.SendMessage, onSendMessage);
 
-  io.on("connection", (socket) => {
-    console.log("Nova conexão!");
-    socket.emit("me", socket.id);
-
-    socket.on("@join-channel", ({ channel, user }) => {
-      socket.join(channel);
-      socket.broadcast.to(channel).emit("@user-joined", user);
-    });
-
-    socket.on("@send-message", (message) => {
-      const { channel } = message;
-      socket.broadcast.to(channel).emit("@new-message", message);
-    });
-  });
-
+  ws.start();
   server.listen(port, () => {
     console.log(`😎 Servidor rodando: ${port}`);
   });
